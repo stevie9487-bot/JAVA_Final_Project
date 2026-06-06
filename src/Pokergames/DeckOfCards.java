@@ -49,4 +49,28 @@ public class DeckOfCards {
             return null; // 牌發完了
         }
     }
+    
+    /**
+     * 🌟 這是專門用來在報告中演示 GitHub 團隊協作與功能的工具方法。
+     * 功能：在 Console 中依序印出目前牌堆中剩餘的所有撲克牌（方便開發除錯與簡報演示）。
+     */
+    public void printDeckDebug() {
+        System.out.println("\n--- 🛠️ [Git 演示工具] 目前牌堆剩餘卡牌列表 ---");
+        if (deck == null || deck.isEmpty()) {
+            System.out.println("牌堆是空的！");
+            return;
+        }
+        
+        int count = 1;
+        // 從目前準備要發的這張牌 (currentCard) 開始，印到最後一張
+        for (int i = currentCard; i < deck.size(); i++) {
+            System.out.print(deck.get(i) + "\t");
+            if (count % 4 == 0) {
+                System.out.println(); // 每 4 張牌換一行，畫面比較漂亮
+            }
+            count++;
+        }
+        System.out.println("\n-----------------------------------------\n");
+    }
 }
+
