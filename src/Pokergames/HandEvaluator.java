@@ -102,4 +102,30 @@ public class HandEvaluator {
         Map<Face, Integer> frequencyMap = getFaceFrequency(hand);
         return frequencyMap.containsValue(3) && frequencyMap.containsValue(2);
     }
+    
+    // h) 新增：計算牌型的權重分數 (分數越高牌型越大)
+    public static int getHandValue(List<Card> hand) {
+        if (isFourOfAKind(hand)) return 7;
+        if (isFullHouse(hand))   return 6;
+        if (isFlush(hand))       return 5;
+        if (isStraight(hand))    return 4;
+        if (isThreeOfAKind(hand))return 3;
+        if (isTwoPairs(hand))    return 2;
+        if (isPair(hand))        return 1;
+        return 0; // 高牌
+    }
+
+    // i) 新增：將分數轉換為中文名稱
+    public static String getHandName(int value) {
+        switch (value) {
+            case 7: return "四條 / 鐵支 (Four of a Kind) 💥";
+            case 6: return "葫蘆 (Full House) 🏠";
+            case 5: return "同花 (Flush) 🌊";
+            case 4: return "順子 (Straight) 🏃";
+            case 3: return "三條 (Three of a Kind) 👌";
+            case 2: return "兩對 (Two Pairs) ✌️";
+            case 1: return "一對 (One Pair) 👍";
+            default: return "高牌 (High Card)";
+        }
+    }
 }

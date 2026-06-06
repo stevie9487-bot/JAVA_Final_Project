@@ -6,27 +6,41 @@ import java.io.*;
 import java.net.*;
 
 public class PokerClientGUI extends JFrame {
-    private JTextArea txtLog;       // 遊戲訊息日誌區
-    private JPanel panelCards;      // 未來放撲克牌圖片的區域
-    private JTextField txtBet;      // 輸入下注金額的框框
-    private JButton btnBet, btnFold, btnCheck; // 動作按鈕
+    private JTextArea txtLog;       
+    private JPanel panelCards;      
+    private JTextField txtBet;      
+    private JButton btnAction, btnFold; 
+    
+    // 🌟 新增：5 個勾選框，讓玩家對應自己的 5 張手牌
+    private JCheckBox[] chkDiscard = new JCheckBox[5];
 
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
     private final String SERVER_IP = "localhost";
     private final int SERVER_PORT = 12345;
+    private boolean myTurn = false;
 
     public PokerClientGUI() {
-        super("Java 線上撲克牌遊戲 - 玩家視窗");
+        super("Java 線上撲克牌遊戲 - 最終完全體");
         setLayout(new BorderLayout());
 
-        // 1. 中間區域：上方放牌、下方放文字日誌
+        // 1. 中間牌桌區
         JPanel centerPanel = new JPanel(new GridLayout(2, 1));
         
-        panelCards = new JPanel(new FlowLayout());
-        panelCards.setBackground(new Color(0, 100, 0)); // 經典撲克牌綠底桌布
-        panelCards.add(new JLabel(new ImageIcon())); // 預留給撲克牌圖片的位置
+        // 牌桌內部分為：手牌文字區 與 勾選框區
+        panelCards = new JPanel(new BorderLayout());
+        panelCards.setBackground(new Color(0, 100, 0));
+        
+        JPanel checkPanel = new JPanel(new FlowLayout());
+        checkPanel.setBackground(new Color(0, 100, 0));
+        for (int i = 0; i < 5; i++) {
+            chkDiscard[i] = new JCheckBox("換第 " + (i + 1) + " 張");
+            chkDiscard[i].setForeground(Color.WHITE);
+            chkDiscard[i].setBackground(new Color(0, 100, 0));
+            checkPanel.add(chkDiscard[i]);
+        }
+        panelCards.add(checkPanel, BorderLayout.SOUTH);
         
         txtLog = new JTextArea();
         txtLog.setEditable(false);
@@ -36,36 +50,49 @@ public class PokerClientGUI extends JFrame {
         centerPanel.add(scrollLog);
         add(centerPanel, BorderLayout.CENTER);
 
-        // 2. 下方區域：控制操作面板（按鈕與下注框）
+        // 2. 下方控制面板
         JPanel bottomPanel = new JPanel(new FlowLayout());
         bottomPanel.add(new JLabel("下注金額:"));
         txtBet = new JTextField("100", 5);
         bottomPanel.add(txtBet);
 
-        btnBet = new JButton("下注 (Bet)");
-        btnCheck = new JButton("過牌 (Check)");
+        // 將動作簡化為：確認執行（換牌+下注）與 蓋牌
+        btnAction = new JButton("確認換牌並下注 (Submit Action)");
         btnFold = new JButton("蓋牌 (Fold)");
 
-        bottomPanel.add(btnBet);
-        bottomPanel.add(btnCheck);
+        bottomPanel.add(btnAction);
         bottomPanel.add(btnFold);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // 按鈕事件綁定：把動作傳給伺服器
-        btnBet.addActionListener(e -> sendAction("BET " + txtBet.getText().trim()));
-        btnCheck.addActionListener(e -> sendAction("CHECK"));
+        // 事件綁定
+        btnAction.addActionListener(e -> submitTurnAction());
         btnFold.addActionListener(e -> sendAction("FOLD"));
 
-        // 視窗基本設定
-        setSize(600, 500);
+        setSize(650, 550);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // 畫面做完後，開始連線
         connectToServer();
     }
 
-    // 連線至伺服器，並開闢「背景執行緒」專門聽伺服器的廣播
+    // 🌟 打包換牌與下注的資訊送給伺服器
+    private void submitTurnAction() {
+        StringBuilder discardIndices = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            if (chkDiscard[i].isSelected()) {
+                discardIndices.append(i).append(",");
+            }
+        }
+        // 指令格式: ACTION [下注額] [要換的索引，用逗號隔開，若不換就寫 none]
+        String discards = discardIndices.length() > 0 ? discardIndices.toString() : "none";
+        String betStr = txtBet.getText().trim();
+        
+        sendAction("ACTION " + betStr + " " + discards);
+        
+        // 送出後重置勾選框
+        for (JCheckBox chk : chkDiscard) chk.setSelected(false);
+    }
+
     private void connectToServer() {
         try {
             socket = new Socket(SERVER_IP, SERVER_PORT);
@@ -74,14 +101,16 @@ public class PokerClientGUI extends JFrame {
             
             txtLog.append("成功連線至伺服器！\n");
 
-            // 【進階技巧】開闢背景執行緒（Thread），這樣讀取伺服器訊息時才不會讓 GUI 畫面卡死
             new Thread(() -> {
                 try {
                     String serverMessage;
                     while ((serverMessage = in.readLine()) != null) {
-                        // 收到伺服器傳來的話，就把它加進文字區
                         String msg = serverMessage;
-                        SwingUtilities.invokeLater(() -> txtLog.append(msg + "\n"));
+                        SwingUtilities.invokeLater(() -> {
+                            txtLog.append(msg + "\n");
+                            // 自動滾動到最下方
+                            txtLog.setCaretPosition(txtLog.getDocument().getLength());
+                        });
                     }
                 } catch (IOException e) {
                     SwingUtilities.invokeLater(() -> txtLog.append("與伺服器斷開連線。\n"));
@@ -93,7 +122,6 @@ public class PokerClientGUI extends JFrame {
         }
     }
 
-    // 送出動作給伺服器
     private void sendAction(String action) {
         if (out != null) {
             out.println(action);
@@ -101,8 +129,6 @@ public class PokerClientGUI extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new PokerClientGUI().setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new PokerClientGUI().setVisible(true));
     }
 }
